@@ -15,12 +15,7 @@ limitations under the License.
 */
 package main
 
-import (
-	"fmt"
-	"github.com/dave/jennifer/jen"
-	"reflect"
-	"strings"
-)
+import "github.com/muvaf/convo/pkg/convo"
 
 type A struct {
 	FieldA string
@@ -37,40 +32,5 @@ type B struct {
 }
 
 func main() {
-	aRef := reflect.ValueOf(A{})
-	aMap := map[string]reflect.StructField{}
-	for i := 0; i < aRef.NumField(); i++ {
-		aMap[strings.ToLower(aRef.Type().Field(i).Name)] = aRef.Type().Field(i)
-	}
-
-	bRef := reflect.ValueOf(B{})
-	fieldMap := map[string]reflect.StructField{}
-	for i := 0; i < bRef.NumField(); i++ {
-		fieldMap[strings.ToLower(bRef.Type().Field(i).Name)] = bRef.Type().Field(i)
-	}
-	var statementList []jen.Code
-	statementList = append(statementList, jen.Id("r").Op(":=").Op("&").Id("B").Values())
-	for name, field := range fieldMap {
-		// string -> string
-		// *string -> *string
-		if aMap[name].Type == field.Type {
-			statementList = append(statementList, jen.Id("r").Dot(field.Name).Op("=").Id("a").Dot(aMap[name].Name))
-		}
-		// *string -> string
-		if aMap[name].Type.Kind() == reflect.Ptr && field.Type.Kind() != reflect.Ptr {
-			s := jen.If(jen.Id("a").Dot(aMap[name].Name).Op("!=").Nil()).Block(
-				jen.Id("r").Dot(name).Op("=").Op("*").Id("a").Dot(aMap[name].Name),
-				)
-			statementList = append(statementList, s)
-		}
-		// string -> *string
-		if aMap[name].Type.Kind() != reflect.Ptr && field.Type.Kind() == reflect.Ptr {
-			statementList = append(statementList, jen.Id("r").Dot(field.Name).Op("=").Op("&").Id("a").Dot(aMap[name].Name))
-		}
-	}
-	statementList = append(statementList, jen.Return(jen.Id("r")))
-
-	f := jen.NewFile("main")
-	f.Func().Params(jen.Id("a").Id("*A")).Id("ConvertToB").Params().Op("*").Id("B").Block(statementList...)
-	fmt.Printf("%#v", f)
+	convo.BasicConversion(A{}, B{})
 }
