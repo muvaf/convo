@@ -13,10 +13,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cmd
+package main
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/dave/jennifer/jen"
+)
 
 func main() {
-	fmt.Println("Hello world!")
+	f := jen.NewFile("main")
+	f.Func().Id("main").Params().Block(
+		jen.Qual("fmt", "Println").Call(jen.Lit("Hello, world")),
+	)
+	fmt.Printf("%#v", f)
 }
