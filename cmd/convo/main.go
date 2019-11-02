@@ -22,45 +22,31 @@ import (
 )
 
 type A struct {
-	FieldA string `json:"fieldA,omitempty"`
-	FieldB *string `json:"fieldB,omitempty"`
+	FieldA string
+	FieldB *string
+	FieldC *string
 }
 
 type B struct {
-	FieldA string `json:"fieldA,omitempty"`
-	FieldB *string `json:"fieldB,omitempty"`
+	FieldA string
+	FieldB *string
 }
 
 func main() {
-	//f := jen.NewFile("main")
-	//f.Func().Id("main").Params().Block(
-	//	jen.Qual("fmt", "Println").Call(jen.Lit("Hello, world")),
-	//)
-	//fmt.Printf("%#v", f)
-	aMap := map[string]interface{}{}
-	bMap := map[string]interface{}{}
-
-	aRef := reflect.ValueOf(A{FieldA: "val1"})
-	for i := 0; i < aRef.NumField(); i++ {
-		fmt.Printf("fieldname: %s, type: %s, tag: %s, value: %s\n", aRef.Type().Field(i).Name, aRef.Type().Field(i).Type, aRef.Type().Field(i).Tag, aRef.Field(i).Interface())
-		aMap[aRef.Type().Field(i).Name] = aRef.Field(i).Interface()
-	}
-
-	bRef := reflect.ValueOf(A{FieldA: "val1"})
+	bRef := reflect.ValueOf(B{})
+	fieldList := make([]string, bRef.NumField())
 	for i := 0; i < bRef.NumField(); i++ {
-		fmt.Printf("fieldname: %s, type: %s, tag: %s, value: %s\n", bRef.Type().Field(i).Name, bRef.Type().Field(i).Type, bRef.Type().Field(i).Tag, bRef.Field(i).Interface())
-		bMap[bRef.Type().Field(i).Name] = bRef.Field(i).Interface()
+		fieldList[i] = bRef.Type().Field(i).Name
 	}
 	var statementList []jen.Code
-	for fieldName := range aMap {
-		s := jen.Id("target").Dot(fieldName).Op("=").Id("source").Dot(fieldName)
+	statementList = append(statementList, jen.Id("r").Op(":=").Op("&").Id("B").Values())
+	for _, fieldName := range fieldList {
+		s := jen.Id("r").Dot(fieldName).Op("=").Id("a").Dot(fieldName)
 		statementList = append(statementList, s)
 	}
+	statementList = append(statementList, jen.Return(jen.Id("r")))
 
 	f := jen.NewFile("main")
-	f.Func().Id("convert").Params(
-		jen.Id("target").Op("*").Id("B"),
-		jen.Id("source").Op("*").Id("A"),
-		).Block(statementList...)
+	f.Func().Params(jen.Id("a").Id("*A")).Id("ConvertToB").Params().Op("*").Id("B").Block(statementList...)
 	fmt.Printf("%#v", f)
 }
