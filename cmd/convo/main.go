@@ -15,22 +15,6 @@ limitations under the License.
 */
 package main
 
-import "github.com/muvaf/convo/pkg/convo"
-
-type A struct {
-	FieldA string
-	FieldB *string
-	Fieldc *string
-	FieldD string
-}
-
-type B struct {
-	FieldA string
-	Fieldb *string
-	FieldC string
-	FieldD *string
-}
-
 func main() {
-	convo.BasicConversion(A{}, B{})
+
 }
