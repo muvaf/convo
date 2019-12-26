@@ -16,6 +16,7 @@ limitations under the License.
 package convo
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -24,23 +25,29 @@ import (
 type A struct {
 	FieldA string
 	FieldB *string
-	Fieldc *string
+	FieldC *string
 	FieldD string
+	FieldE SubType
 }
 
 type B struct {
 	FieldA string
-	Fieldb *string
+	FieldB *string
 	FieldC string
 	FieldD *string
+	FieldE SubType
+}
+
+type SubType struct {
+	SubFieldA string
 }
 
 // TODO(muvaf): improve test cases to be smaller and more contained
 func TestBasicConversion(t *testing.T) {
 
 	type args struct {
-		from interface{}
-		to   interface{}
+		from reflect.Type
+		to   reflect.Type
 	}
 	type want struct {
 		result string
@@ -52,18 +59,20 @@ func TestBasicConversion(t *testing.T) {
 	}{
 		"PointerValueAndFieldNameCaseDifference": {
 			args: args{
-				from: A{},
-				to:   B{},
+				from: reflect.TypeOf(A{}),
+				to:   reflect.TypeOf(B{}),
 			},
 			want: want{
-				result: `func (a *A) GetB() *B {
-	r := &B{}
+				result: `func (a *A) GetB() B {
+	r := B{}
 	r.FieldA = a.FieldA
-	r.Fieldb = a.FieldB
-	if a.Fieldc != nil {
-		r.FieldC = *a.Fieldc
+	r.FieldB = a.FieldB
+	if a.FieldC != nil {
+		r.FieldC = *a.FieldC
 	}
 	r.FieldD = &a.FieldD
+	r.FieldE = SubType{}
+	r.FieldE.SubFieldA = a.FieldE.SubFieldA
 	return r
 }`,
 			},
@@ -72,9 +81,9 @@ func TestBasicConversion(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			result := BasicConversion(tc.args.from, tc.args.to)
+			result := Convert(tc.args.from, tc.args.to)
 			if diff := cmp.Diff(tc.want.result, result.GoString()); diff != "" {
-				t.Errorf("BasicConversion() -want, +got:\n%s", diff)
+				t.Errorf("Convert() -want, +got:\n%s", diff)
 			}
 		})
 	}

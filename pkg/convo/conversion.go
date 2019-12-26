@@ -23,53 +23,63 @@ import (
 	"github.com/dave/jennifer/jen"
 )
 
-// BasicConversion converts the classes whose matching fields' are assignable
+// Convert converts the classes whose matching fields' are assignable
 // to each other no matter whether they are Ptr or not.
 // Does not work with anonymous structs.
-func BasicConversion(a interface{}, b interface{}) *jen.Statement {
-	// a and b has to be non-pointer.
-	aRef := reflect.ValueOf(a)
-	bRef := reflect.ValueOf(b)
-	if aRef.Type().Name() == "" || bRef.Type().Name() == "" {
-		panic(fmt.Errorf("convo does not work with anonymous structs"))
-	}
+func Convert(aRef reflect.Type, bRef reflect.Type) *jen.Statement {
+	aReceiverName := string(strings.ToLower(aRef.Name())[0])
+	statementList := append(structConversion(aRef, aReceiverName, "r", bRef), jen.Return(jen.Id("r")))
+	return jen.Func().
+		Params(jen.Id(aReceiverName).Op("*").Id(aRef.Name())).
+		Id(fmt.Sprintf("Get%v", bRef.Name())).
+		Params().Id(bRef.Name()).
+		Block(statementList...)
+}
+
+func structConversion(aRef reflect.Type, sourcePath, resultPath string, bType reflect.Type) []jen.Code {
 	aMap := map[string]reflect.StructField{}
 	for i := 0; i < aRef.NumField(); i++ {
-		aMap[strings.ToLower(aRef.Type().Field(i).Name)] = aRef.Type().Field(i)
+		// TODO: inline fields?
+		aMap[strings.ToLower(aRef.Field(i).Name)] = aRef.Field(i)
 	}
-	aReceiverName := string(strings.ToLower(aRef.Type().Name())[0])
-
-	fieldList := make([]reflect.StructField, bRef.NumField())
-	for i := 0; i < bRef.NumField(); i++ {
-		fieldList[i] = bRef.Type().Field(i)
+	// TODO: ptr typed field
+	statementList := []jen.Code{jen.Id(resultPath).Op("=").Id(bType.Name()).Values()}
+	if !strings.Contains(resultPath, ".") {
+		statementList = []jen.Code{jen.Id(resultPath).Op(":=").Id(bType.Name()).Values()}
 	}
-	statementList := []jen.Code{
-		jen.Id("r").Op(":=").Op("&").Id(bRef.Type().Name()).Values(),
+	fieldList := make([]reflect.StructField, bType.NumField())
+	for i := 0; i < bType.NumField(); i++ {
+		fieldList[i] = bType.Field(i)
 	}
 	for _, field := range fieldList {
+		statementList = append(statementList, fieldConversion(aMap, sourcePath, resultPath, field)...)
+	}
+	return statementList
+}
+
+func fieldConversion(aMap map[string]reflect.StructField, aSourcePath, resultPath string, field reflect.StructField) []jen.Code {
+	var result []jen.Code
+	switch field.Type.Kind() {
+	case reflect.Struct:
+		// TODO: name of the field might be different in result path.
+		result = append(result, structConversion(field.Type, fmt.Sprintf("%s.%s", aSourcePath, field.Name), fmt.Sprintf("%s.%s", resultPath, field.Name), field.Type)...)
+	default:
 		equatedName := strings.ToLower(field.Name)
 		// string -> string
 		// *string -> *string
 		if aMap[equatedName].Type == field.Type {
-			statementList = append(statementList, jen.Id("r").Dot(field.Name).Op("=").Id(aReceiverName).Dot(aMap[equatedName].Name))
+			result = append(result, jen.Id(resultPath).Dot(field.Name).Op("=").Id(aSourcePath).Dot(aMap[equatedName].Name))
 		}
 		// *string -> string
 		if aMap[equatedName].Type.Kind() == reflect.Ptr && field.Type.Kind() != reflect.Ptr {
-			s := jen.If(jen.Id(aReceiverName).Dot(aMap[equatedName].Name).Op("!=").Nil()).Block(
-				jen.Id("r").Dot(field.Name).Op("=").Op("*").Id(aReceiverName).Dot(aMap[equatedName].Name),
-			)
-			statementList = append(statementList, s)
+			result = append(result, jen.If(jen.Id(aSourcePath).Dot(aMap[equatedName].Name).Op("!=").Nil()).Block(
+				jen.Id(resultPath).Dot(field.Name).Op("=").Op("*").Id(aSourcePath).Dot(aMap[equatedName].Name),
+			))
 		}
 		// string -> *string
 		if aMap[equatedName].Type.Kind() != reflect.Ptr && field.Type.Kind() == reflect.Ptr {
-			statementList = append(statementList, jen.Id("r").Dot(field.Name).Op("=").Op("&").Id(aReceiverName).Dot(aMap[equatedName].Name))
+			result = append(result, jen.Id(resultPath).Dot(field.Name).Op("=").Op("&").Id(aSourcePath).Dot(aMap[equatedName].Name))
 		}
 	}
-	statementList = append(statementList, jen.Return(jen.Id("r")))
-
-	return jen.Func().
-		Params(jen.Id(aReceiverName).Op("*").Id(aRef.Type().Name())).
-		Id(fmt.Sprintf("Get%v", bRef.Type().Name())).
-		Params().Op("*").Id(bRef.Type().Name()).
-		Block(statementList...)
+	return result
 }
